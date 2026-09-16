@@ -32,6 +32,7 @@ to `localStorage`; hard-reload (Ctrl+F5 / Cmd+Shift+R) after editing the file.
 | `index.html`, `404.html` (root) | Redirect stubs only. The app moved out of the repo root into `simulator/`, and GitHub Pages serves this repo from the root — these keep <https://iams-yb-lab.github.io/frequency_shift_simulator/> and every old deep link working. Adapted from the handbook's `templates/redirect-stub`. **Not** the app; do not edit them expecting a change on screen. |
 | [simulator/HANDOVER.md](simulator/HANDOVER.md) | Engine conventions, verification workflow, and the gotchas worth not rediscovering. **Read first when picking the project back up.** |
 | [simulator/CHANGELOG.md](simulator/CHANGELOG.md) | What changed in each work session, 2026-08-07 onward. |
+| [simulator/verify/](simulator/verify/) | The four verification layers from HANDOVER as Node scripts (parse, closed-form physics, headless Chrome over CDP, regression fingerprint) — for machines without `jsc`. |
 | [logs/](logs/) | One session log per working session — what changed, how, and what verified it — plus the screenshots they cite. [logs/README.md](logs/README.md) indexes them. |
 | [LICENSE](LICENSE) | MIT. Two copyright holders — see [ABOUT.md](ABOUT.md) for who wrote what. |
 | [LOCAL-FILES.md](LOCAL-FILES.md) | **What is deliberately not in this repo** — `assets/`, `scenes/` and `tools/` live on disk and the NAS, per the lab handbook's rule on 3D exports and measurement data. Read this if a doc links a path you do not have. |

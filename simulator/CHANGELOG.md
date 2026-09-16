@@ -382,3 +382,51 @@ lines, where the inconsistency became obvious.
 - Visual check: screenshot of the stitched plot with an astigmatic source + out-of-plane cylinder +
   90°-capable periscope — both envelopes continuous across the band, waist box, legend, and the probe
   tooltip reading `w∥ 0.81 / w⊥ 0.22 / ⊥ V-run · 150 mm off board`.
+
+---
+
+## Session 2026-09-16
+
+Verification this session (scripts now in [`verify/`](verify/)): all 6 inline scripts parse (Node 22
+`new Function`); **47 closed-form physics checks** in Node; **44 end-to-end checks** in headless Chrome over
+CDP with zero console errors; a regression fingerprint of a 16-component scene built only from pre-existing
+types (laser · HWP · PBS · lens · cylinder · AOM · iris · mirror · dichroic · fiber pair · plate BS · camera ·
+power meter · dump — 13 beams / 62 segments, every endpoint, `q1`/`q2`/`qa`, `w1`/`w2`, path length and power)
+is **bit-identical** before and after. Evidence: [`logs/2026-09-16_prism-grating-dispersion.png`](../logs/2026-09-16_prism-grating-dispersion.png).
+
+### New components — dispersive optics
+- **Prism** (`prism`) — Thorlabs **PS850** by default (F2 equilateral, 10 mm faces), with **PS852** (F2, 25 mm)
+  and **PS853** (N-SF11, 25 mm) presets and a custom mode (glass F2 / N-SF11 / N-BK7 / UV fused silica, apex
+  angle, face length). The beam is refracted through the **drawn triangle at true size** — entry face → glass →
+  exit face — at n(λ) from the Sellmeier equation, with total internal reflection handled (the ray bounces
+  inside, or is reported trapped). Two lasers of different colour separate by their deviation difference
+  (F2, 60°: 399 vs 680 nm → 3.94°). Panel: n(λ), incidence θ₁, deviation δ, δ_min and the incidence that gives
+  it, dδ/dλ in mrad/nm (by re-tracing at λ ± 0.5 nm), in-plane magnification, glass path, and **⟂ Rotate to
+  minimum deviation for this beam**. The default orientation is minimum deviation for a beam travelling +x at
+  680 nm. Mount fine-tune (angle / ⊥ / ∥ nudges) as for mirrors.
+- **Grating** (`grating`) — Thorlabs **GH13-24U** by default (2400 lines/mm reflective holographic, 12.7 mm
+  ruled width), **GH13-24V** preset, or custom lines/mm and width. Reflective and single-sided (a beam from
+  the substrate side passes it by), one traced beam per order from d(sin α + sin β) = mλ; m = 0 is the specular
+  reflection; evanescent orders are skipped. **Traced-order chips** (−2 … +2, default −1 0 +1); a **working
+  order** carries the set efficiency η (default 0.5) and the other propagating orders share 1 − η (when the
+  working order is evanescent, all propagating orders share equally). Panel: λ, period, λ/d, incidence α, the
+  Littrow angle for the working order, per-order β / power share / dβ/dλ, and **↩ Rotate to Littrow** (the
+  working order retraces the incoming beam). Orders carry `splitTag` `m=+1` etc. and `gratingOrder`; they are
+  **not** AOM orders, so an iris never blocks them.
+- Both appear in the sidebar palette, the radial menu (new **Dispersive** group), the schematic export
+  (true-size triangle; ruled line with a hatch on the substrate side), the 3D view (procedural glass prism /
+  ruled plate) and the assist evaluation (clear aperture = 0.8 × face length / ruled width).
+
+### Physics: how the new elements touch `q`
+- Neither element has focusing power, but both are **anamorphic in the plane of incidence**: at a tilted face,
+  or on diffraction to a different angle, the in-plane width scales by M = cos θ_out / cos θ_in. That is applied
+  as the ABCD diag(M, 1/M) — q → M²q — on the in-plane `q` only, and `qa` is re-mapped from the untouched
+  vertical q, the same discipline as for a cylindrical lens. Overall M = 1 at minimum deviation and at Littrow.
+- **Inside glass the engine carries the reduced q̂ = q/n** (Siegman): propagation over a geometric length L
+  advances q̂ by L/n, and `beamRadiusFromQ` with the vacuum λ returns the true radius. The in-glass legs are
+  stored as segments on the beam (`inGlass: n`) and advance the **path-length axis by L/n as well**, so the
+  w(z) sampler — which interpolates q by z — stays exact through the prism.
+- Consequence, and checked in the tests: a prism at minimum deviation still leaves a *focused* beam
+  **astigmatic**. The in-plane axis sees an effective in-glass length L/(n·M_entry²), the vertical axis L/n, so
+  the two waists end up L/n · (1 − 1/M_entry²) apart — 2.96 mm for the PS850 at 680 nm. That is textbook
+  tilted-plate astigmatism, not a bug; a collimated beam does not notice it.

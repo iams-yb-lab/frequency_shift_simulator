@@ -113,6 +113,8 @@ there too.
 | | QWP | Linear ↔ circular; double-pass acts as a HWP | fast axis |
 | **Lens** | Lens | Spherical thin lens, ABCD on the `q` parameter | focal length (± f) |
 | | **Cyl Lens** | Power on **one** transverse axis only (§6.3) | focal length, **powered axis** (in-plane / out-of-plane) |
+| **Dispersive** | **Prism** | Refracts through a real triangle at n(λ); colours leave at different angles (§6.7) | Thorlabs part (PS850 / PS852 / PS853), glass, apex, face length, *rotate to minimum deviation* |
+| | **Grating** | Reflective grating, one beam per diffraction order, d(sin α + sin β) = mλ (§6.7) | Thorlabs part (GH13-24U), lines/mm, ruled width, η, working order, traced orders, *rotate to Littrow* |
 | **Detector** | Output / dump | Absorbs the beam; ends a path | mode |
 | | Power Meter | Non-blocking power readout | — |
 | | **Camera** | Imaging sensor: spot size in pixels, fill, clipping — per axis | sensor W×H, pixel pitch |
@@ -256,6 +258,25 @@ optical symbols, true positions and angles, wavelength-coloured beams, and label
 crossing the beams. Scope it to one board or the whole scene. It updates with the layout, so the
 figure never goes stale.
 
+### 6.7 Separate wavelengths with a prism or a grating
+
+**Prism.** Drop a **Prism** on the beam. It arrives as the Thorlabs PS850 (F2, 10 mm) already at minimum
+deviation for a 680 nm beam travelling left→right; for any other beam or colour press **⟂ Rotate to minimum
+deviation for this beam** in its panel. Add a second laser of another wavelength on the same axis and the two
+beams leave the prism at different angles — the panel quotes n(λ), the deviation δ, and dδ/dλ so you can size
+the separation at a given distance (F2, 60°: 399 vs 680 nm differ by ≈3.9°). The triangle is drawn at true
+size and the beam really refracts through it, so a beam that misses the glass simply passes by, and a steep
+exit angle shows up as total internal reflection.
+
+**Grating.** Drop a **Grating** (Thorlabs GH13-24U, 2400 lines/mm) on the beam. The ruled face is the side
+the little substrate block is *not* on; a beam arriving from behind passes through. Each traced order is its
+own beam: the chips **−2 … +2** choose which orders are traced (evanescent ones are skipped automatically),
+the **working order** gets the efficiency η you set and the others share the rest. **↩ Rotate to Littrow**
+sends the working order straight back along the incoming beam — the external-cavity-diode-laser geometry — and
+the panel lists every order's angle β, power share and dispersion dβ/dλ. At 2400 lines/mm only the 0th and one
+first order exist for visible light, and the first order needs incidence above ≈39° at 680 nm; the Littrow
+row tells you where that is (54.7° at 680 nm, 41.8° at 556 nm, 28.6° at 399 nm).
+
 ---
 
 ## 7. Conventions that will bite you
@@ -271,6 +292,12 @@ figure never goes stale.
   length, beam quality and astigmatism all reset at a Fiber Out.
 - **There are 8 mm gaps in the drawn beam after each optic.** The tracer pushes the next segment
   clear of the component surface. Harmless, but that is what those little holes are.
+- **Inside a prism, `z` counts reduced length L/n**, not the geometric glass path, so the `w(z)` plot and the
+  beam parameter stay consistent. A ruler on the bench reads L(1 − 1/n) more per prism pass (≈3 mm for the
+  10 mm PS850). The prism panel quotes both.
+- **A prism or an off-Littrow grating order changes the in-plane beam width** by cos θ_out / cos θ_in at each
+  face, and a focused beam leaves a prism slightly astigmatic even at minimum deviation. Both are real
+  effects and show in the dashed `w(z)` envelope.
 - **Scenes autosave to the browser's local storage**, so closing the tab does not lose work — but
   local storage is per-browser and easy to wipe. **Save a `.json`** for anything you care about.
 
@@ -311,6 +338,14 @@ top view cannot show it. Look at the dashed envelope in **w(z)**. See §6.3.
 **Coupling efficiency will not go above ~80% no matter what lens I use.** The beam is probably
 elliptical at the fiber face. Check the ellipticity row in the FiberIn panel; if it is not ≈1.00×,
 no spherical lens will save you. See §6.3.
+
+**My grating shows only one order.** At 2400 lines/mm a visible first order only exists for incidence
+above sin⁻¹(λ/d − 1) — about 39° at 680 nm — and the −1 order needs the mirror-image incidence. Check
+the **Incidence α** and **Littrow α** rows in the panel, then rotate the grating (or press **↩ Rotate to
+Littrow**). Orders marked *evanescent* cannot exist at that angle.
+
+**My beam vanished inside the prism.** The exit face is beyond the critical angle (the panel's δ row says
+*trapped (TIR)*). Press **⟂ Rotate to minimum deviation for this beam**, or choose a lower-index glass.
 
 **I edited `simulator.html` and see no change.** Hard-reload: <kbd>Ctrl</kbd>+<kbd>F5</kbd> /
 <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>.

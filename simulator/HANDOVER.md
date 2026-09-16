@@ -1,8 +1,8 @@
-# Handover — frequency_shift_simulator (as of 2026-08-22, rev 5)
+# Handover — frequency_shift_simulator (as of 2026-09-16, rev 6)
 
 ## Files & rules
 - `simulator/simulator.html` — the WORKING file (all edits go here). Single self-contained
-  HTML app, **17.1k lines** at rev 5, six inline `<script>` blocks (one of them ~13 MB of base64
+  HTML app, **17.5k lines** at rev 6, six inline `<script>` blocks (one of them ~13 MB of base64
   STL — never `grep` it without `cut`). `index.html` is a landing page only.
 - The pristine original is **not in the tree** — it is the `original-pre-merge` tag,
   @s20000125-alt's last published version. Retrieve it when a change is rejected ("go back to the
@@ -26,6 +26,13 @@ Four layers, cheapest first. Run 1 after *every* edit batch; 3–4 before claimi
    what turns "no regression" into a measurement. `scenes/IAMS_Yb_Lab_2026-08-20.json` (265 beams /
    1903 segments) exercises lenses, cylinders, AOMs, fibers and V-mirrors at once.
 
+**No `jsc` (Windows)?** The same four layers are scripted in [`verify/`](verify/) with Node 22 and no
+packages: `parse_check.js` (layer 1), `physics_test.js` (layer 2 — loads the q-helper + dispersive-optics range
+with `vm` and asserts against closed forms), `cdp_test.js <html> tests|fp|shot` (layers 3–4 and a screenshot;
+headless Chrome over CDP through Node's built-in WebSocket, killed by its own scratch profile). `fp` on
+`git show <rev>:simulator/simulator.html` vs the working file is the fingerprint comparison; it builds a
+16-component scene of pre-existing types in-page because `scenes/` is local-only.
+
 Then **look at it**: screenshot the canvas or the w(z) plot over CDP. Two of the three real defects
 in the 08-21 session were found by looking, with the assertion suite fully green.
 
@@ -42,6 +49,17 @@ in the 08-21 session were found by looking, with the assertion suite fully green
   test with `_qaIsRound(qa)` or `isAstigmatic(beamOrSegOrHit)`. Segments carry ONE `qa` (invariant along
   the segment); `_lastHit` carries `qa` + `beamRadiusVertMm`. **If you add an element with optical power,
   remap `qa` there or astigmatism goes subtly wrong downstream of it.**
+- **Dispersive optics (`prism`, `grating`) live in the `DISPERSIVE OPTICS` block right after the qa helpers.**
+  The prism is traced through its real triangle (`_prismWorldVerts` → `_prismEdgeHit` → `_prismTrace`, TIR
+  bounces included); the grating by `gratingOrders` — d(sin α + sin β) = mλ with α, β from the normal
+  `(−sin a, cos a)`, positive toward the tangent `(cos a, sin a)`, so m = 0 is specular and the ruled face is
+  the +normal side (same facing rule as a mirror). Both are **anamorphic without power**: in-plane width ×
+  cos θ_out/cos θ_in per interface, applied as `qApplyABCD(q, M, 0, 0, 1/M)` on `q` only, with `qa` re-mapped
+  by `_qaDiff(qVertOf(qIn, qa), qOut)`. **Inside glass `q` is the reduced q̂ = q/n**: propagate by `L/n`, and
+  the in-glass segments (`seg.inGlass = n`) advance `pathStartMm`/`pathEndMm` by `L/n` too, so the caustic
+  sampler's `q1 + dz` stays exact. `_prismLast` / `_gratingLast` on the component feed the panel readouts
+  the way `_lastHit` does. Grating orders carry `gratingOrder` + `splitTag 'm=+1'`, never `aomOrder`, so the
+  iris ignores them.
 - **`drawBeamCaustic()` samples every beam in the scene, and that is cached.** The sampling loop is
   hoisted into `_buildCausticBeamTraces(beams)` and memoized by `_getCausticBeamTraces(beams)`, keyed
   on the **identity** of the traced-beam array. `traceRays()` returns a fresh array every time, so the
@@ -74,6 +92,14 @@ in the 08-21 session were found by looking, with the assertion suite fully green
   fiber resets z and beam quality.
 - Interaction apertures are decoupled from drawn/3D housing sizes: fiberin/fiberout ±10 mm, AOM ±10 mm box
   (AOM physics otherwise the untouched original).
+
+## Features added 2026-09-16
+Two dispersive components, both defaulting to the lab's Thorlabs parts: **Prism** (`prism`, PS850 — F2
+equilateral, 10 mm; PS852/PS853 presets; Sellmeier glasses F2 / N-SF11 / N-BK7 / UVFS; traced through the
+true triangle; "rotate to minimum deviation" button; δ, δ_min, dδ/dλ, M and glass-path readouts) and
+**Grating** (`grating`, GH13-24U — 2400/mm holographic, 12.7 mm; per-order chips, working order + η,
+Littrow button, per-order β / share / dβ/dλ). Palette, radial-menu group "Dispersive", schematic symbols,
+3D fallbacks, assist apertures, mount fine-tune, save/load. Verification scripts in `verify/`. See CHANGELOG.md.
 
 ## Features added this session
 Channel pairing UI (A–H dropdown + status), NA ↔ mode-field-radius controls on both fiber ends, collimator &
@@ -137,6 +163,14 @@ See CHANGELOG.md for the full list and the verification evidence.
 12. **Inside a V-Mirror vertical run there is no board position.** Anything mapping plot-z → canvas must
    handle that (the probe pins its marker at the mirror and shows `⊥h=`), or it silently drops the link
    over what can be the longest stretch of the path.
+13. **A prism at minimum deviation makes a *focused* beam astigmatic — physics, not a bug.** The tilted faces
+   give the tangential axis an effective in-glass length L/(n·M²) against L/n for the sagittal one
+   (M = cos θ₂/cos θ₁ ≈ 1.47 for F2 at 54°), so the two waists separate by ≈3 mm for the 10 mm PS850. A
+   collimated beam does not care. Likewise a grating order with β ≠ −α leaves elliptical (× cos β/cos α).
+   Say this before "fixing" `qa` at either element — the test suite asserts the displacement.
+14. **z inside glass is *reduced* length.** `z on beam` and the w(z) axis advance by L/n through a prism
+   (5.5 mm for 8.9 mm of F2) so that q and z stay consistent for the sampler. A ruler on the bench disagrees
+   by L(1 − 1/n) per prism pass. The panel's "Glass path" row quotes both numbers.
 
 ## User context
 Yb atomic-physics lab; fluent in Gaussian optics — communicate in those terms. Typical parameters: 460 nm,

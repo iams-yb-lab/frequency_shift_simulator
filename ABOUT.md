@@ -61,7 +61,7 @@ Its limits were all in the same direction: **it modelled one transverse axis, in
 |---|---|---|
 | Transverse axes tracked | 1 | 2 (astigmatic) |
 | Beam leaves the board plane | no | yes (periscopes) |
-| Component types | 19 | 23 |
+| Component types | 19 | 25 |
 | Top-level functions | 251 | 332 |
 | Lines | 13,397 | 17,145 |
 
@@ -202,6 +202,12 @@ Smaller additions and fixes, in brief:
 - **Interface** — light/dark themes for reports, a `µm`-label rendering fix (CSS uppercase
   was turning `µ` into a Greek capital Mu, so every "(µm)" read "(MM)"), and the OS cursor
   restored while probing.
+- **Dispersive optics** (added 2026-09-16 by Shayne Bennetts) — a **prism** traced through its real
+  triangle at Sellmeier n(λ) (Thorlabs PS850/PS852/PS853 presets; minimum-deviation button) and a
+  reflective **grating** with one traced beam per order from d(sin α + sin β) = mλ (Thorlabs GH13-24U
+  preset; order chips, working-order efficiency, Littrow button). Both apply the in-plane anamorphic
+  magnification to `q` and keep the reduced q̂ = q/n inside glass, so the two-axis engine stays exact —
+  including the tilted-face astigmatism a prism gives a focused beam.
 
 ---
 

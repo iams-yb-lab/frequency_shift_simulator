@@ -611,6 +611,33 @@ footer{
 
     <div class="comp-card reveal">
       <div class="icon"><svg viewBox="0 0 120 64">
+        <path class="ln-fill" d="M60 8 L36 54 L84 54 Z"/>
+        <path class="bm" d="M8 24 L 44 38 L 70 42 L 112 58"/>
+        <path class="bm-dim" d="M70 42 L 112 50 M70 42 L 112 42"/>
+      </svg></div>
+      <div class="tag">Prism</div>
+      <h3>Dispersive Prism</h3>
+      <p>Two refractions at tilted faces, each set by Snell's law with an index that depends on wavelength, so every colour leaves at its own angle. The beam is traced through the real triangle (Thorlabs PS850, F2 glass) at n(λ) from the Sellmeier equation; at minimum deviation the path is symmetric and the beam width is preserved.</p>
+      <div class="cmath"><span>δ<sub>min</sub> = 2 arcsin</span><span>(</span><span>n sin</span><span class="frac"><span class="num">A</span><span class="den">2</span></span><span>)</span><span>− A</span></div>
+      <div class="phys">Sellmeier n(λ) · refraction at both faces · TIR handled · F2: 399 vs 680 nm separate by 3.9°</div>
+    </div>
+
+    <div class="comp-card reveal">
+      <div class="icon"><svg viewBox="0 0 120 64">
+        <path class="ln" d="M30 52 H 90"/>
+        <path class="ln" d="M34 52 v-6 M42 52 v-6 M50 52 v-6 M58 52 v-6 M66 52 v-6 M74 52 v-6 M82 52 v-6"/>
+        <path class="bm" d="M8 12 L 60 52 L 112 12"/>
+        <path class="bm-dim" d="M60 52 L 100 8 M60 52 L 30 8"/>
+      </svg></div>
+      <div class="tag">Grating</div>
+      <h3>Diffraction Grating</h3>
+      <p>Periodic grooves make the reflected wavelets interfere: they add up only in the directions where neighbouring grooves differ by a whole number of wavelengths. Each order leaves at its own angle per wavelength — the grating equation — so a grating is a spectrometer and, in the Littrow geometry, the wavelength-selective mirror of an external-cavity diode laser. Modelled as the Thorlabs GH13-24U (2400 lines/mm).</p>
+      <div class="cmath"><span>d (sin α + sin β) = m λ</span></div>
+      <div class="phys">One beam per order · evanescent orders skipped · Littrow β = α · dβ/dλ = m / (d cos β)</div>
+    </div>
+
+    <div class="comp-card reveal">
+      <div class="icon"><svg viewBox="0 0 120 64">
         <rect class="ln-fill" x="40" y="20" width="40" height="24" rx="2"/>
         <path class="ln" d="M46 20 v-8 h28" stroke-dasharray="3 3"/>
         <path class="bm" d="M8 32 H 40 M80 32 L 112 24"/>
