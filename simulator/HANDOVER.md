@@ -1,4 +1,4 @@
-# Handover — frequency_shift_simulator (as of 2026-09-16, rev 6)
+# Handover — frequency_shift_simulator (as of 2026-09-17, rev 7)
 
 ## Files & rules
 - `simulator/simulator.html` — the WORKING file (all edits go here). Single self-contained
@@ -8,8 +8,24 @@
   @s20000125-alt's last published version. Retrieve it when a change is rejected ("go back to the
   original X code") with `git show original-pre-merge:simulator.html`.
 - User tests in the browser; remind them to hard-reload (Ctrl+F5). Scenes autosave to localStorage.
+- **Where the repo lives (2026-09-17).** The remote is `https://github.com/iams-yb-lab/frequency_shift_simulator`,
+  branch `main`, pushed directly (no PR flow). On the Lab110 Windows workstation there are two clones, both
+  tracking `origin/main`: `G:\Shared drives\Lab110Share\Projects\MissAlign\Prisms` (the user's preferred one,
+  on the Google Shared Drive) and `C:\Users\USER\dev\frequency_shift_simulator`. `git pull` in whichever you
+  edit, push from the same one. The original Mac clone (`~/Desktop/optical-path-designer`) holds the local-only
+  `scenes/`, `assets/`, `tools/` — see LOCAL-FILES.md.
+- **Google Drive and git.** A plain `git clone` into the Shared Drive died with `could not lock config file …
+  File exists` and left a half-made `.git`. `git init` → `git remote add origin …` → `git fetch` →
+  `git checkout -B main origin/main` in the same folder worked. If Drive locking bites mid-operation, do the
+  work in the `C:\` clone and pull on the drive afterwards.
+- **Line endings.** Both Windows clones have `core.autocrlf=true`, so the working copy is CRLF while the repo
+  stores LF. Any script that matches text against the file must normalise `\r\n` → `\n` first (and write back
+  CRLF), or every anchor silently fails to match. Commits print LF/CRLF warnings for new files; harmless.
+- **`.claude/settings.json` has a `Stop` hook** that runs `tools/git-autocommit.sh`. `tools/` is local-only on
+  the Mac, so on a fresh clone the hook simply fails at the end of every Claude turn. Harmless, but it is why you
+  will see a hook error you did not cause; commit by hand.
 
-## Verifying an edit (no Node on this machine)
+## Verifying an edit
 Four layers, cheapest first. Run 1 after *every* edit batch; 3–4 before claiming anything works.
 1. **Parse** — extract the six inline `<script>` blocks and compile each with `new Function(src)`
    under `jsc` (`/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc`);
@@ -26,12 +42,28 @@ Four layers, cheapest first. Run 1 after *every* edit batch; 3–4 before claimi
    what turns "no regression" into a measurement. `scenes/IAMS_Yb_Lab_2026-08-20.json` (265 beams /
    1903 segments) exercises lenses, cylinders, AOMs, fibers and V-mirrors at once.
 
-**No `jsc` (Windows)?** The same four layers are scripted in [`verify/`](verify/) with Node 22 and no
-packages: `parse_check.js` (layer 1), `physics_test.js` (layer 2 — loads the q-helper + dispersive-optics range
-with `vm` and asserts against closed forms), `cdp_test.js <html> tests|fp|shot` (layers 3–4 and a screenshot;
-headless Chrome over CDP through Node's built-in WebSocket, killed by its own scratch profile). `fp` on
-`git show <rev>:simulator/simulator.html` vs the working file is the fingerprint comparison; it builds a
-16-component scene of pre-existing types in-page because `scenes/` is local-only.
+The `jsc` route above is what the original Mac had (no Node there). **On the Windows workstation** there is
+Node 22 and Chrome, and the same four layers are scripted in [`verify/`](verify/) with no packages:
+`parse_check.js` (layer 1), `physics_test.js` (layer 2 — loads the q-helper + dispersive-optics range with
+`vm` and asserts against closed forms), `cdp_test.js <html> tests|fp|shot` (layers 3–4 and a screenshot;
+headless Chrome over CDP through Node's built-in WebSocket, killed by its own scratch profile). Recipe:
+
+```
+cd simulator
+node verify/parse_check.js                                   # ~1 s
+node verify/physics_test.js                                  # ~1 s, 47 checks
+node verify/cdp_test.js simulator.html tests out.json        # ~20 s, 44 checks + console errors
+git show f0eee9e:simulator/simulator.html > %TEMP%/orig.html # any pre-change rev
+node verify/cdp_test.js %TEMP%/orig.html fp fp_orig.json     # hash must equal …
+node verify/cdp_test.js simulator.html fp fp_new.json        # … this hash
+node verify/cdp_test.js simulator.html shot demo.png         # then LOOK at it
+```
+
+`fp` builds a 16-component scene of pre-existing types in-page because `scenes/` is local-only; extend
+`FINGERPRINT` when you add a type that should stay bit-identical. Add new closed-form checks to `TESTS` /
+`physics_test.js` rather than asserting the code against itself. If you post-process the JSON with Python on
+Windows, set `PYTHONIOENCODING=utf-8` — the messages contain arrows and Greek letters and cp1252 will throw.
+The scripts take the Chrome path from `CHROME` if the default is wrong.
 
 Then **look at it**: screenshot the canvas or the w(z) plot over CDP. Two of the three real defects
 in the 08-21 session were found by looking, with the assertion suite fully green.
@@ -92,6 +124,50 @@ in the 08-21 session were found by looking, with the assertion suite fully green
   fiber resets z and beam quality.
 - Interaction apertures are decoupled from drawn/3D housing sizes: fiberin/fiberout ±10 mm, AOM ±10 mm box
   (AOM physics otherwise the untouched original).
+
+## Adding a component type — every site that has to change
+The prism/grating session touched **30 places**; miss one and the type half-works (drops but is not drawn,
+draws but cannot be selected, traces but has no panel, …). In file order, with the nearest landmark:
+1. Sidebar palette — a `.comp-item[data-type=…]` block under the right `<h2>` (~line 700).
+2. `ALL_TYPES` (~1701) — also seeds `MODEL_BASE_ROT` / `MODEL_ROT` and the 3D STL-upload slots.
+3. `COMP_H` / `COMP_W` (~3347 / ~4453) — footprint for selection and overlap only; give the optics their
+   own true-size aperture in `intersectComp` if the part is smaller than its mount.
+4. `MIRROR_FINE_TYPES` (~3631) if the mount-style angle/⊥/∥ nudges should apply.
+5. Panel action functions (presets, chips, "rotate to …" helpers) next to `toggleAOMOrderDisplay` (~3547).
+6. `mkComp` defaults (~4373) — plain literals only; a `const` table defined later in the file is in its TDZ
+   if `mkComp` ever runs during load.
+7. `TYPE_STYLE` and `TYPE_ICON` (~4417 / ~4447) — without an icon the generic box draws `undefined`.
+8. `drawComp` (~4483) — a dedicated `if (c.type === …) { … ctx.restore(); return; }` block, or accept the
+   generic box. Use `_labelVisible(c)` for hover-only labels.
+9. Physics helpers — next to the q helpers (~5633–5900) so `physics_test.js` can `vm`-load them.
+10. `intersectComp` (~6505) — return `{ t, nx, ny }` with `t > 1`; single-sided optics test the facing.
+11. `traceBeam` (~6750) — `allBeams.push(beam)` the prefix, spawn continuations `PUSH` past the surface with
+    `traceBeam(nb, allBeams, c)`; touch `q`, `qa`, `pathLen`, `freqs`, `splitTag`; set `beam.terminal` if absorbing.
+12. `_schemSymbol` (~3735) — a `case` for the publication export; register an obstacle via `obst()`.
+13. `v3dProceduralComp` (~2220) — a Three.js fallback unless you embed an STL.
+14. `updateProps` — the editable-angle list (~10011), the fine-tune list (~10016), a property section (after
+    the dichroic block, before `if (c.type === 'mirror')`), and the string-key list in **both** input-binding
+    handlers (~9548 and ~11385: `key === 'mode' || key === 'channel' || …`) plus the "refresh panel on change"
+    type lists (~11392, ~11425).
+15. `ANGLE_TYPES` (~13199, group rotation), `markerColorForComp` in the caustic optics bar (~15419),
+    `clearAp` (~16645) and `ASSIST_TYPES` (~17093), the radial-menu `GROUPS` (~17523).
+16. Docs: CHANGELOG, this file, MANUAL §4 table, ABOUT's component count, `index.html` card, a session log in
+    `logs/` with a screenshot, and the `FINGERPRINT`/`TESTS` scenes in `verify/`.
+Line numbers are for rev 7 (17.8k lines); grep for the landmark names, not the numbers.
+
+## Editing this 22 MB file without losing an afternoon
+- **Anchored edits, not hand edits.** Write a script (Python did fine) with a list of
+  `(anchor, replacement)` pairs, assert each anchor occurs **exactly once** before touching anything, apply all
+  or nothing. It caught two would-be mistakes in one session.
+- **Known duplicate anchor:** `if (c.type === 'lens' || c.type === 'cylens') {` appears in both `intersectComp`
+  and `traceBeam`. Anchor on the comment line that follows it instead.
+- `grep -n … | cut -c1-200` and `sed -n a,bp | cut -c1-200` — the `STL_INLINE` lines (~1735–1750) and the
+  `STL_MAP` lines in the third script block (~16505–16515) are 0.4–2.7 MB of base64 each and will flood the
+  context. `awk 'length($0)>5000{print NR}' simulator.html` lists them.
+- **Bash heredocs on this Windows setup mangle backslashes** (`"\\n"` arrived as a real newline) and Python's
+  console is cp1252. Write helper scripts with the editor/Write tool, run them with `PYTHONIOENCODING=utf-8`.
+- Six inline `<script>` blocks; the first (line ~1094, 13 MB) is the app, the third (~16500, 9 MB) is more
+  STL. `verify/parse_check.js` reports per block.
 
 ## Features added 2026-09-16
 Two dispersive components, both defaulting to the lab's Thorlabs parts: **Prism** (`prism`, PS850 — F2
@@ -171,8 +247,22 @@ See CHANGELOG.md for the full list and the verification evidence.
 14. **z inside glass is *reduced* length.** `z on beam` and the w(z) axis advance by L/n through a prism
    (5.5 mm for 8.9 mm of F2) so that q and z stay consistent for the sampler. A ruler on the bench disagrees
    by L(1 − 1/n) per prism pass. The panel's "Glass path" row quotes both numbers.
+15. **The rotate-to helpers store angles to 0.001°** (`toFixed(3)`, same as the mirror nudges). That leaves
+   M within ~1e-5 of 1 and a Littrow return within ~1e-5 rad of −d, not 1e-9. Three "failures" on the first
+   test run were tolerances written for exact angles; the code was right each time. Likewise the entry face
+   of a prism *does* widen the in-plane beam (× cos θ₂/cos θ₁ ≈ 1.47) — the exit face undoes it.
+16. **Thorlabs product pages cannot be fetched** (client-side rendered; `thorproduct.cfm`, `item/…`, the
+   group pages and third-party mirrors all return a shell or 403). Part identities came from search-result
+   titles. That is how "PS850 = N-SF11 25 mm" in the request turned out to be **F2, 10 mm** (PS853 is the
+   N-SF11 one). Check the part before modelling it, and say so when the request and the catalogue disagree.
+17. **Grating orders are not AOM orders.** They carry `gratingOrder` / `splitTag 'm=+1'`, never `aomOrder`, so
+   the iris (an AOM-order filter) passes them and the export's AOM-fan exaggeration ignores them. Keep it that
+   way unless the iris is taught about gratings explicitly.
 
 ## User context
-Yb atomic-physics lab; fluent in Gaussian optics — communicate in those terms. Typical parameters: 460 nm,
-PM460-HP-like fiber (w_f ≈ 1.5–1.65 µm), AOM double-pass, 25 mm breadboard grid. Wants minimal, lab-realistic
-changes and an uncluttered canvas.
+Yb atomic-physics lab (IAMS Lab110); fluent in Gaussian optics — communicate in those terms. Typical parameters:
+399 / 556 / 680 nm (and 460 nm), PM460-HP-like fiber (w_f ≈ 1.5–1.65 µm), AOM double-pass, 25 mm breadboard
+grid. Wants minimal, lab-realistic changes and an uncluttered canvas. Requests name **Thorlabs part numbers**
+the lab owns — model the real part (glass, size, groove density) and offer the neighbouring parts as presets.
+Expects the work pushed to GitHub in the same session, in the repo's existing style (anchored edits, verified,
+CHANGELOG + session log + screenshot). GitHub user for pushes from the Windows box: `shaynebennetts`.
