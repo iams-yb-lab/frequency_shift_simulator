@@ -1,8 +1,8 @@
-# Handover — frequency_shift_simulator (as of 2026-09-17, rev 7)
+# Handover — frequency_shift_simulator (as of 2026-09-17, rev 8)
 
 ## Files & rules
 - `simulator/simulator.html` — the WORKING file (all edits go here). Single self-contained
-  HTML app, **17.5k lines** at rev 6, six inline `<script>` blocks (one of them ~13 MB of base64
+  HTML app, **17.9k lines** at rev 8, six inline `<script>` blocks (one of them ~13 MB of base64
   STL — never `grep` it without `cut`). `index.html` is a landing page only.
 - The pristine original is **not in the tree** — it is the `original-pre-merge` tag,
   @s20000125-alt's last published version. Retrieve it when a change is rejected ("go back to the
@@ -51,8 +51,8 @@ headless Chrome over CDP through Node's built-in WebSocket, killed by its own sc
 ```
 cd simulator
 node verify/parse_check.js                                   # ~1 s
-node verify/physics_test.js                                  # ~1 s, 47 checks
-node verify/cdp_test.js simulator.html tests out.json        # ~20 s, 44 checks + console errors
+node verify/physics_test.js                                  # ~1 s, 56 checks
+node verify/cdp_test.js simulator.html tests out.json        # ~20 s, 61 checks + console errors
 git show f0eee9e:simulator/simulator.html > %TEMP%/orig.html # any pre-change rev
 node verify/cdp_test.js %TEMP%/orig.html fp fp_orig.json     # hash must equal …
 node verify/cdp_test.js simulator.html fp fp_new.json        # … this hash
@@ -124,6 +124,14 @@ in the 08-21 session were found by looking, with the assertion suite fully green
   fiber resets z and beam quality.
 - Interaction apertures are decoupled from drawn/3D housing sizes: fiberin/fiberout ±10 mm, AOM ±10 mm box
   (AOM physics otherwise the untouched original).
+- **A laser is a list of samples.** `laserSamples(laser)` → `[{ nm, power }]`: one entry for a CW laser (its
+  `wavelength` / `power`), one per sampled wavelength for `source_mode === 'supercontinuum'` (band
+  `sc_min_nm…sc_max_nm` on `sc_step_nm`, power = `sc_psd` × slice width, capped at `SC_MAX_SAMPLES` = 64).
+  `traceRays` emits one beam per sample; supercontinuum beams carry `scSample = λ`, which the FiberIn store
+  (`c._beams`, one per λ, re-emitted in full by the paired FiberOut) and the caustic source keys
+  (`'la<id>@<λ>'`, parsed with `parseInt` so the `@` is ignored for the component lookup) use. A beam without
+  `scSample` is handled exactly as before, which is what keeps the fingerprint bit-identical. **If you add
+  a per-source cache or a per-laser lookup, key it by `(sourceLaserId, scSample)`, not the laser alone.**
 
 ## Adding a component type — every site that has to change
 The prism/grating session touched **30 places**; miss one and the type half-works (drops but is not drawn,
@@ -168,6 +176,11 @@ Line numbers are for rev 7 (17.8k lines); grep for the landmark names, not the n
   console is cp1252. Write helper scripts with the editor/Write tool, run them with `PYTHONIOENCODING=utf-8`.
 - Six inline `<script>` blocks; the first (line ~1094, 13 MB) is the app, the third (~16500, 9 MB) is more
   STL. `verify/parse_check.js` reports per block.
+
+## Features added 2026-09-17
+Laser **supercontinuum source mode**: band λ_min…λ_max on a nominal spacing, spectral power density per nm,
+one traced beam per sample (own colour and q), quick-set bands, sample readout; FiberIn/FiberOut carry the
+whole band; caustic lists one source per sample. Verification suites extended (56 physics / 61 browser).
 
 ## Features added 2026-09-16
 Two dispersive components, both defaulting to the lab's Thorlabs parts: **Prism** (`prism`, PS850 — F2
@@ -255,6 +268,12 @@ See CHANGELOG.md for the full list and the verification evidence.
    group pages and third-party mirrors all return a shell or 403). Part identities came from search-result
    titles. That is how "PS850 = N-SF11 25 mm" in the request turned out to be **F2, 10 mm** (PS853 is the
    N-SF11 one). Check the part before modelling it, and say so when the request and the catalogue disagree.
+18. **A supercontinuum is many beams, and the Spectrum tab does not know that.** `updateSpectrum` groups
+   by RF offset, so a 64-sample band shows as one carrier line whose power is the sum. Per-λ power lives in
+   the individual beams (probe, camera, power meter see the strongest one at that spot; the caustic lists
+   each sample). Also, `wavelengthColor()` is pure red for 645–700 nm and a fixed dark red above 750 nm —
+   three or more samples sharing a colour is cosmetic, not a lost beam. Beam counts multiply: 64 samples ×
+   every PBS / AOM split × prefix beams can reach thousands; the cap exists for that reason.
 17. **Grating orders are not AOM orders.** They carry `gratingOrder` / `splitTag 'm=+1'`, never `aomOrder`, so
    the iris (an AOM-order filter) passes them and the export's AOM-fan exaggeration ignores them. Keep it that
    way unless the iris is taught about gratings explicitly.

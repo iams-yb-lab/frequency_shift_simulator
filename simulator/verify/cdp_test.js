@@ -217,6 +217,65 @@ const TESTS = `(function(){
     const back = JSON.parse(json);
     ok(back.some(c => c.type === 'prism' && c.glass === 'F2' && c.part === 'PS850') && back.some(c => c.type === 'grating' && c.grooves_mm === 2400 && Array.isArray(c.orders)), 'component JSON carries glass/part/grooves/orders');
 
+    // ── 13. supercontinuum source ──
+    components.length = 0; selected = null;
+    const S = mkComp('laser', 0, 300); S.angle = 0; S.source_mode = 'supercontinuum';
+    S.sc_min_nm = 450; S.sc_max_nm = 700; S.sc_step_nm = 25; S.sc_psd = 0.004; components.push(S);
+    const P2 = mkComp('prism', 200, 300); components.push(P2);
+    lastTracedBeams = traceRays(); renderNow();
+    const sm = laserSamples(S);
+    ok(sm.length === 11 && sm[0].nm === 450 && sm[10].nm === 700, '450–700 nm on 25 nm gives 11 samples incl. both edges', sm.map(x => x.nm));
+    ok(Math.abs(sm.reduce((a, x) => a + x.power, 0) - 0.004 * 250) < 1e-12, 'sample powers sum to psd × bandwidth', sm.reduce((a, x) => a + x.power, 0));
+    ok(Math.abs(sm[0].power - 0.004 * 12.5) < 1e-12 && Math.abs(sm[5].power - 0.004 * 25) < 1e-12, 'edge samples carry half a slice, interior a full one');
+    const wlsBorn = [...new Set(lastTracedBeams.filter(b => b.scSample != null).map(b => b.scSample))].sort((a, b) => a - b);
+    ok(wlsBorn.length === 11 && wlsBorn[0] === 450 && wlsBorn[10] === 700, 'eleven distinct sampled beams traced', wlsBorn);
+    const exitAng = {};
+    for (const b of lastTracedBeams) {
+      if (b.scSample == null || !b.segments.some(s => s.inGlass)) continue;
+      const s = b.segments[b.segments.length - 1]; const a = Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
+      if (!(b.scSample in exitAng) || Math.abs(a) > Math.abs(exitAng[b.scSample])) exitAng[b.scSample] = a;
+    }
+    const ks = Object.keys(exitAng).map(Number).sort((a, b) => a - b);
+    ok(ks.length === 11 && ks.every((k, i) => i === 0 || Math.abs(exitAng[k]) < Math.abs(exitAng[ks[i - 1]])), 'prism fans all 11 samples, deviation decreasing with λ', ks.map(k => deg(exitAng[k]).toFixed(2)));
+    const cols = new Set(lastTracedBeams.filter(b => b.scSample != null).map(b => b.freqs[0].color));
+    // wavelengthColor() is pure red from 645 to 700 nm, so 650/675/700 share a colour: 9 distinct of 11
+    ok(cols.size >= 9, 'samples carry their own colours (red plateau ≥ 645 nm merges three)', cols.size);
+    const q450 = lastTracedBeams.find(b => b.scSample === 450).segments[0].q1, q700 = lastTracedBeams.find(b => b.scSample === 700).segments[0].q1;
+    ok(Math.abs(q450.im / q700.im - 700 / 450) < 1e-9, 'same waist ⇒ zR ∝ 1/λ across samples');
+    const keys = new Set(lastTracedBeams.filter(b => b.scSample != null).map(b => _causticBeamSourceKey(b)));
+    ok(keys.size === 11 && [...keys].every(k => k.startsWith('la' + S.id + '@')), 'caustic source keys are one per sample', [...keys].slice(0, 3));
+    ok(_causticSourceLabelFromKey('la' + S.id + '@450').includes('450 nm'), 'caustic label names the sample wavelength');
+    // dichroic splits the band at its edge
+    components.length = 0; components.push(S);
+    const Dc = mkComp('dichroic', 200, 300); Dc.cutoff_nm = 560; Dc.mode = 'reflect_shorter'; components.push(Dc);
+    lastTracedBeams = traceRays();
+    const reflW = new Set(lastTracedBeams.filter(b => b.scSample != null && b.dy > 0.5).map(b => b.scSample));
+    const transW = new Set(lastTracedBeams.filter(b => b.scSample != null && b.dx > 0.5 && b.segments.length > 1).map(b => b.scSample));
+    ok([...reflW].every(w => w <= 560) && [...transW].every(w => w > 560) && reflW.size === 5 && transW.size === 6, 'dichroic at 560 nm reflects 450–550 and transmits 575–700', [[...reflW], [...transW]]);
+    // a fibre carries the whole band
+    components.length = 0; components.push(S);
+    const Fi = mkComp('fiberin', 200, 300); Fi.angle = 0; Fi.channel = '7'; components.push(Fi);
+    const Fo = mkComp('fiberout', 200, 500); Fo.angle = 0; Fo.channel = '7'; components.push(Fo);
+    lastTracedBeams = traceRays();
+    const outW = new Set(lastTracedBeams.filter(b => b.sourceFiberOutId === Fo.id).map(b => b.scSample));
+    ok(outW.size === 11 && !outW.has(undefined), 'FiberOut re-emits all 11 samples', [...outW]);
+    S.source_mode = 'cw'; lastTracedBeams = traceRays();
+    const outCW = lastTracedBeams.filter(b => b.sourceFiberOutId === Fo.id);
+    ok(outCW.length >= 1 && new Set(outCW.map(b => b.wavelength)).size === 1 && outCW.every(b => b.scSample === undefined), 'CW fibre emission unchanged (one wavelength, no scSample)');
+    S.source_mode = 'supercontinuum'; S.sc_min_nm = 400; S.sc_max_nm = 2400; S.sc_step_nm = 1;
+    ok(laserWavelengths(S).length === SC_MAX_SAMPLES, 'sample cap holds at ' + SC_MAX_SAMPLES);
+    S.sc_step_nm = 30; S.sc_min_nm = 450; S.sc_max_nm = 700;
+    const w30 = laserWavelengths(S), s30 = laserSamples(S);
+    ok(w30[w30.length - 1] === 700 && w30.length === 10 && Math.abs(s30.reduce((a, x) => a + x.power, 0) - 0.004 * 250) < 1e-12, 'non-multiple spacing: edge included, power still psd × span', w30);
+    selected = S; updateProps();
+    panel = document.getElementById('prop-content').innerHTML;
+    ok(panel.includes('Supercontinuum') && panel.includes('Emitted samples') && panel.includes('Spectral power density'), 'laser panel shows the supercontinuum controls');
+    setLaserSCBand(S.id, 400, 700, 25);
+    ok(S.sc_min_nm === 400 && laserWavelengths(S).length === 13, 'quick-set band applies');
+    S.source_mode = 'cw'; selected = S; updateProps();
+    panel = document.getElementById('prop-content').innerHTML;
+    ok(panel.includes('Wavelength (nm)') && !panel.includes('Emitted samples'), 'CW panel is the old one');
+
     renderNow();
   } catch (e) { R.fail.push('EXCEPTION ' + e.message + ' @ ' + (e.stack || '').split('\\n')[1]); }
   return R;
@@ -257,10 +316,9 @@ const FINGERPRINT = `(function(){
 // ── demo scene for the screenshot ────────────────────────────────────────────
 const DEMO = `(function(){
   components.length = 0; selected = null; selectedSet.clear();
-  // top: three Yb-lab colours through the PS850 at minimum deviation for 680 nm
-  for (const [wl, lbl] of [[680, '680 nm'], [556, '556 nm'], [399, '399 nm']]) {
-    const L = mkComp('laser', 50, 125); L.angle = 0; L.wavelength = wl; L.label = lbl; components.push(L);
-  }
+  // top: a supercontinuum (400–700 nm on 25 nm) through the PS850 at minimum deviation for 680 nm
+  const L = mkComp('laser', 50, 125); L.angle = 0; L.label = 'SuperK'; L.source_mode = 'supercontinuum';
+  L.sc_min_nm = 400; L.sc_max_nm = 700; L.sc_step_nm = 25; L.sc_psd = 0.04; components.push(L);
   const P = mkComp('prism', 275, 125); components.push(P);
   // bottom: 556 nm from the right onto the GH13-24U at α = +45°; m = 0 straight down, m = +1 to the right
   // (kept in the lower-left so the prism's fan, heading lower-right, does not cross it)

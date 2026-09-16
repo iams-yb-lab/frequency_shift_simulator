@@ -11,6 +11,7 @@ function slice(startMarker, endMarker){
 }
 let code = '';
 code += 'function nmToMm(v){ return (v || 680) * 1e-6; }\n';
+code += slice('// ── SUPERCONTINUUM SOURCE', 'function qPropagateFree(q, d){');
 code += slice('function qPropagateFree(q, d){', '// ── DISPERSIVE OPTICS');
 code += slice('// ── DISPERSIVE OPTICS', 'function gratingShares(');
 code += slice('function gratingShares(', '\n}\n') + '\n}\n';
@@ -206,6 +207,21 @@ const grating = { type:'grating', x:0, y:0, angle:135, grooves_mm:2400, width_mm
   const h3 = G._prismEdgeHit(V3, -100, 0, 1, 0, 1, -1);
   const t3 = G._prismTrace(c3, -100 + h3.t, 0, 1, 0, n680);
   ok(t3 && near(Math.abs(t3.dev), md.dev, 1e-9), 'the other candidate (entry via the second face) is also min deviation');
+}
+console.log('— Supercontinuum sampling');
+{
+  const L = { source_mode: 'supercontinuum', sc_min_nm: 450, sc_max_nm: 700, sc_step_nm: 25, sc_psd: 0.04 };
+  const w = G.laserWavelengths(L), s = G.laserSamples(L);
+  ok(w.length === 11 && w[0] === 450 && w[10] === 700, '450–700 / 25 nm → 11 samples including both edges', w);
+  ok(near(s.reduce((a, x) => a + x.power, 0), 0.04 * 250, 1e-12), 'Σ power = psd × span');
+  ok(near(s[0].power, 0.04 * 12.5, 1e-12) && near(s[3].power, 0.04 * 25, 1e-12), 'half a slice at the edges, a full one inside');
+  const w2 = G.laserWavelengths({ ...L, sc_step_nm: 30 });
+  ok(w2.length === 10 && w2[9] === 700, 'non-multiple spacing keeps the band edge as the last sample', w2);
+  ok(near(G.laserSamples({ ...L, sc_step_nm: 30 }).reduce((a, x) => a + x.power, 0), 0.04 * 250, 1e-12), 'and Σ power is still psd × span');
+  ok(G.laserWavelengths({ ...L, sc_min_nm: 400, sc_max_nm: 2400, sc_step_nm: 1 }).length === 64, 'sample count capped at 64');
+  ok(G.laserWavelengths({ ...L, sc_min_nm: 700, sc_max_nm: 450 })[0] === 450, 'reversed band is swapped, not empty');
+  ok(G.laserWavelengths({ wavelength: 556 }).length === 1 && G.laserSamples({ wavelength: 556, power: 2 })[0].power === 2, 'CW laser: one sample at its own power');
+  ok(!G.laserIsSupercontinuum({ wavelength: 680 }) && !G.laserIsSupercontinuum({ source_mode: 'cw' }), 'absent / cw source_mode is CW');
 }
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exitCode = fail ? 1 : 0;

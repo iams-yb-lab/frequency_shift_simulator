@@ -208,6 +208,9 @@ Smaller additions and fixes, in brief:
   preset; order chips, working-order efficiency, Littrow button). Both apply the in-plane anamorphic
   magnification to `q` and keep the reduced q̂ = q/n inside glass, so the two-axis engine stays exact —
   including the tilted-face astigmatism a prism gives a focused beam.
+- **Supercontinuum source mode** (2026-09-17, Shayne Bennetts) — a laser can emit a band λ_min…λ_max on a
+  nominal spacing with a spectral power density per nm, one traced beam per sample, so a prism or grating
+  shows the spectrum, a dichroic splits the band and a fibre carries all of it.
 
 ---
 

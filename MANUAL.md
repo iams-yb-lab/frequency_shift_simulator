@@ -99,7 +99,7 @@ there too.
 
 | Group | Component | What it does | Key settings |
 |---|---|---|---|
-| **Laser** | Laser | Source of everything. Emits a TEM₀₀ Gaussian | λ, power, polarisation, **w₀**, **z₀**, M², *source astigmatism* |
+| **Laser** | Laser | Source of everything. Emits a TEM₀₀ Gaussian — or, as a **supercontinuum**, one beam per sampled wavelength of a band (§6.7) | source type, λ, power, polarisation, **w₀**, **z₀**, M², *source astigmatism*; **λ_min / λ_max / Δλ / power per nm** in supercontinuum mode |
 | **Modulator** | AOM | Bragg-diffracts into orders, shifting each by ±m·f_RF. Double-pass helper available | f_RF, RF power, crystal preset, order, double-pass |
 | | EOM | Pockels phase modulation → ±f_mod sidebands | f_mod, modulation depth, enable |
 | **Mirror** | Mirror | Angle in = angle out | angle, reflectivity |
@@ -277,6 +277,15 @@ the panel lists every order's angle β, power share and dispersion dβ/dλ. At 2
 first order exist for visible light, and the first order needs incidence above ≈39° at 680 nm; the Littrow
 row tells you where that is (54.7° at 680 nm, 41.8° at 556 nm, 28.6° at 399 nm).
 
+**Supercontinuum.** Set a Laser's **Source type** to *Supercontinuum*, give it a band (**λ_min**, **λ_max**),
+a **nominal spacing Δλ** and a **spectral power density** (power units per nm). The source then emits one
+beam per sampled wavelength — same waist, own colour, power = density × the slice of band it stands for,
+so the samples always add up to density × bandwidth. Send it through a Prism or Grating and the band fans
+out into a spectrum; a Dichroic splits it at its cutoff; a fibre link carries every sample. The quick-set
+buttons give the visible band, the Yb line set (399 … 680 nm in ~47 nm steps) and a full 400–2400 nm SuperK
+span. The w(z) tab lists each sample as its own source (`⚡ Laser · 525 nm (SC)`). Keep the count in mind:
+64 samples is the cap, and every splitter downstream multiplies the beam count.
+
 ---
 
 ## 7. Conventions that will bite you
@@ -343,6 +352,14 @@ no spherical lens will save you. See §6.3.
 above sin⁻¹(λ/d − 1) — about 39° at 680 nm — and the −1 order needs the mirror-image incidence. Check
 the **Incidence α** and **Littrow α** rows in the panel, then rotate the grating (or press **↩ Rotate to
 Littrow**). Orders marked *evanescent* cannot exist at that angle.
+
+**My supercontinuum shows one line in the Spectrum tab.** Expected: that tab groups by RF offset, not by
+wavelength, so all samples land on one carrier whose power is the sum. Read per-wavelength behaviour off the
+bench (probe, camera) or the w(z) tab's per-sample source list.
+
+**Several supercontinuum samples have the same colour.** Above ≈645 nm the canvas colour is pure red and
+beyond 750 nm a fixed dark red; every sample is still traced separately — hover a beam or check the w(z)
+source list for its wavelength.
 
 **My beam vanished inside the prism.** The exit face is beyond the critical angle (the panel's δ row says
 *trapped (TIR)*). Press **⟂ Rotate to minimum deviation for this beam**, or choose a lower-index glass.

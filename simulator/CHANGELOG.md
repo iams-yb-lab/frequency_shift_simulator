@@ -430,3 +430,36 @@ is **bit-identical** before and after. Evidence: [`logs/2026-09-16_prism-grating
   **astigmatic**. The in-plane axis sees an effective in-glass length L/(n·M_entry²), the vertical axis L/n, so
   the two waists end up L/n · (1 − 1/M_entry²) apart — 2.96 mm for the PS850 at 680 nm. That is textbook
   tilted-plate astigmatism, not a bug; a collimated beam does not notice it.
+
+---
+
+## Session 2026-09-17
+
+Verification: 6/6 scripts parse; **56 physics checks** in Node; **61 in-browser checks** with zero console
+errors; the pre-existing-types fingerprint (13 beams / 62 segments) is still `b39e17f2`, **bit-identical**.
+Evidence: [`logs/2026-09-17_supercontinuum-prism.png`](../logs/2026-09-17_supercontinuum-prism.png).
+
+### Laser: supercontinuum source mode
+- **Source type** dropdown on the laser: *Single wavelength (CW)* — everything as before — or
+  **Supercontinuum**: a band **λ_min … λ_max** sampled on a **nominal spacing Δλ**, each sample traced as
+  its own beam with its own colour and its own q (same waist, so z_R ∝ 1/λ). The band edge is always the
+  last sample even when the span is not a multiple of Δλ. Strength is given as a **spectral power density**
+  (power units per nm): a sample carries density × the width of the band slice it stands for (half-way to
+  each neighbour, cut at the edges), so the samples sum to density × bandwidth exactly. Sample count is
+  capped at 64 (the spacing is widened and the panel says so). Defaults 450–700 nm / 25 nm / 0.04 per nm.
+- Quick-set buttons: *Visible 400–700 · 25*, *Yb lines 399–680 · ~47* (lands on 399 / 446 / 493 / 540 /
+  587 / 633 / 680 nm), *Full SC 400–2400 · 100*. The panel lists sample count, band, total and per-sample
+  power. In supercontinuum mode the single *Wavelength* row becomes *Reference λ*, used only by readouts
+  that need one wavelength (fibre NA ↔ mode radius, assist, resonator).
+- **Everything downstream already worked per beam**, so the band behaves physically with no further
+  changes: a prism or grating fans the samples out (the evidence screenshot), a dichroic splits the band at
+  its cutoff, fibre coupling is evaluated per sample. Two places did have to learn about it: a **FiberIn now
+  collects every supercontinuum sample** (one per wavelength) and the paired FiberOut re-emits them all —
+  CW beams keep the old last-one-wins rule — and the **caustic source dropdown lists one entry per sample**
+  (`⚡ Laser · 525 nm (SC)`), also through fibres and V-Mirror links.
+- Canvas: the laser's exit arrow is drawn as a spectrum in supercontinuum mode. Schematic export colours
+  each sample by wavelength and the existing strand-offset pass fans co-propagating colours apart. The
+  Spectrum tab sums the samples into one carrier line (it groups by RF offset, not by λ).
+- Colours: `wavelengthColor()` is pure red from 645 to 700 nm and fixed dark red beyond 750 nm, so samples
+  there share a colour — cosmetic only; every sample is still traced and listed by its own λ.
+- Lasers without `source_mode` (every existing scene) are CW; `mkComp` now writes `source_mode: 'cw'`.
